@@ -16,7 +16,7 @@
   $_SERVER['REMOTE_ADDR'] = "localhost"; // Necessary if running from command line
   require_once DRUPAL_ROOT . '/includes/bootstrap.inc';
   drupal_bootstrap(DRUPAL_BOOTSTRAP_FULL);
-
+ // put start time and end time
   $start_time = strtotime('2005-12-31 23:59:59');
   $end_time = strtotime('2006-01-31 23:59:59');
   print "<table>
