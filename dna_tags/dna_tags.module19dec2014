@@ -1,0 +1,355 @@
+<?php
+/**
+ * @author sanjay
+ * @copyright 2014
+ */
+
+ /**
+ * Implements hook_permission().
+ */
+function dna_tags_permission() {
+  return array(
+    'dna tags update' => array(
+      'title' => t('dna tags updates'),
+      'description' => t('Dna tags updated in content type.'),
+    )
+  );
+} 
+ 
+ /**
+  * implimentation of hook_menu()
+  */
+function dna_tags_menu() {
+  $items = array();
+  $items['admin/config/content/tags'] = array(
+    'title' => 'Tag Merge',
+    'description' => 'Content type tags update fucntionality',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('dna_tags_update_form'),
+    'access arguments' => array('dna tags update'),
+    'type' => MENU_NORMAL_ITEM,
+  );
+  
+  $items['admin/config/content/authors'] = array(
+    'title' => 'Author Merge',
+    'description' => 'Content type Author update fucntionality',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('dna_tags_update_form'),
+    'access arguments' => array('dna tags update'),
+    'type' => MENU_NORMAL_ITEM,
+  );
+
+  $items['admin/config/content/cities'] = array(
+    'title' => 'Cities Merge',
+    'description' => 'Content type tags update fucntionality',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('dna_tags_update_form'),
+    'access arguments' => array('dna tags update'),
+    'type' => MENU_NORMAL_ITEM,
+  );
+
+   $items['admin/config/content/agencies'] = array(
+    'title' => 'Agencies Merge',
+    'description' => 'Content type tags update fucntionality',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('dna_tags_update_form'),
+    'access arguments' => array('dna tags update'),
+    'type' => MENU_NORMAL_ITEM,
+  );
+  
+  $items['admin/config/content/countdown'] = array(
+    'title' => 'Tags update in content type',
+    'description' => 'Content type tags update fucntionality',
+    'page callback' => 'dna_tags_countdown',
+    'access arguments' => array('dna tags update'),
+    'type' => MENU_NORMAL_ITEM,
+  );
+
+  return $items;
+}
+
+/**
+ *implimentation of hook_form()
+ *This function is used to update taxonomy terms in content tags field
+ */
+function dna_tags_update_form($form, &$form_state) {
+  $form = array();
+  $path = current_path();
+  $machine_name = arg(3);
+  if( !isset( $form_state['storage']['confirm'] ) ) {
+    
+    $form['dna_tags'] = array(
+      '#type' => 'fieldset',
+      '#title' => t("DNA $machine_name updated"),
+      '#description' => t("Updates new $machine_name with existing $machine_name ."),
+      '#collapsible' => FALSE,
+      '#collapsed' => FALSE
+    );
+    
+    if(arg(4) && arg(5)) {
+       $r = arg(4);
+       $u = arg(5);
+    }    
+    
+    $form['dna_tags']['tags_remove'] = array(
+      '#type' => 'textfield',
+      '#title' => "Remove $machine_name",
+      '#autocomplete_path' => 'taxonomy/autocomplete/field_'.$machine_name,
+      '#maxlength' => 1024,
+      '#required' => TRUE,
+      '#default_value' =>isset($r) ? $r : '',
+    );
+    
+    $form['dna_tags']['tags_update'] = array(
+      '#type' => 'textfield',
+      '#title' => "Updated $machine_name",
+      '#autocomplete_path' => 'taxonomy/autocomplete/field_'.$machine_name,
+      '#maxlength' => 1024,
+      '#required' => TRUE,
+     '#default_value' => isset($u) ? $u : '',
+    );
+    
+    $form['dna_tags']['dna_tags_submit'] = array(
+      '#type' => 'submit',
+      '#value' => 'Update',
+    );
+  
+    return $form;
+  }else {
+     drupal_add_js('(function($) { Drupal.behaviors.dnaTags = { attach: function (context, settings) {
+		  $(".load").css("display", "none");
+		   $("#dna-tags-update-form #edit-submit").click(function(){
+			$(".load").css("display", "block");
+		
+		    });
+		  } };})(jQuery);', 'inline');
+     $terms_change = taxonomy_get_term_by_name($form_state['values']['tags_remove'], $machine_name);
+     if (!empty($terms_change)) {
+       $chnage_tid = array_shift($terms_change);
+       $tid = $chnage_tid->tid;
+      }
+      $nids = taxonomy_select_nodes($tid,FALSE);
+      $count_nids = count($nids);
+      $content = '<h4>Confirmation dialog</h4>';    
+      $content .= '<p> If you want to update. Click "Confirm" below to actually submit. </p>';    
+      $content .= '<div class="messages error">
+                 '.$count_nids.'  nodes needs to update.So it may take more than 5 minutes, Please wait.</div>';
+      $content .= '<div class="load"><img src="http://jooble.in/css/images_new/loading.gif" style="width: 200px;height: auto;position: absolute;z-index: 99999;top: 80px;" /></div>'; 
+      $form['intro'] = array('#markup' => $content);       
+      return confirm_form($form, $question="Do you really want to make the change?", $path, $description = "Warning, Are you sure to update this tag", $yes = "Confirm");
+  }
+  
+ return $form;
+}
+
+/**
+ *
+ * implimentation of hook_form_validate
+ */
+function dna_tags_update_form_validate($form, &$form_state) {
+  global $user;
+  $machine_name = arg(3);
+  if( isset($form_state['storage']['confirm'] ))  {
+    $form_state['values'] = $form_state['storage']['original_form'] ;
+  }
+  $tid = '';
+  $tid_update = '';
+  $terms_change = taxonomy_get_term_by_name($form_state['values']['tags_remove'], $machine_name);
+  if (!empty($terms_change)) {
+    $chnage_tid = array_shift($terms_change);
+    $tid = $chnage_tid->tid;
+  }else {
+    form_set_error('tags_remove',"Please put a valid remove $machine_name");
+  }
+ 
+  if($machine_name == 'authors') {
+     $result = db_query("SELECT entity_id FROM {field_data_field_authors} WHERE entity_type = 'field_collection_item'   AND field_authors_tid =$tid");
+     $rowcount = $result->rowCount();
+    if($rowcount) {
+      form_set_error('tags_not_update',"You can not update this author, due to internal dependencies.");
+    }
+  }
+
+   if($machine_name == 'agencies') {
+     $result = db_query("SELECT entity_id FROM {field_data_field_agencies} WHERE entity_type = 'field_collection_item'   AND field_agencies_tid =$tid");
+     $rowcount = $result->rowCount();
+    if($rowcount) {
+      form_set_error('agencies_not_update',"You can not update this agencies, due to internal dependencies.");
+    }
+  }
+
+  $nids = taxonomy_select_nodes($tid,FALSE);
+  $count_nids = count($nids);
+  if(!$count_nids) {
+    form_set_error('tags_update_node', "Please put a valid remove $machine_name, no <b>Article</b> found.");
+  }
+  
+  $update_tags = explode(",", $form_state['values']['tags_update']);
+  if(in_array($form_state['values']['tags_remove'], $update_tags)) {
+     form_set_error('tags_same','<b>'.$form_state['values']['tags_remove']. '</b> can not be same in both input field.');
+  } 
+  foreach($update_tags as $u_key => $u_value) {
+     $terms_update = taxonomy_get_term_by_name($u_value, $machine_name);
+      if (empty($terms_update)) {  
+	 form_set_error($u_value,"$u_value is not a valid $machine_name tag.");
+      }
+  }
+}
+
+/**
+ *implimentation of hook_form_submit()
+ *
+ */
+function dna_tags_update_form_submit($form, &$form_state){
+  $machine_name = arg(3);
+  if( !isset($form_state['storage']['confirm'] ))  {
+    $form_state['storage']['confirm'] = TRUE; // this will cause the form to be rebuilt, entering the confirm part of the form
+    $form_state['storage']['original_form'] = $form_state['values']; 
+    $form_state['rebuild'] = TRUE;
+  }else {
+    $form_state['values'] = $form_state['storage']['original_form'] ;
+    global $user;
+    $tid = '';
+    $tid_update = '';
+    $terms_change = taxonomy_get_term_by_name($form_state['values']['tags_remove'], $machine_name);
+    if (!empty($terms_change)) {
+      $chnage_tid = array_shift($terms_change);
+      $tid = $chnage_tid->tid;
+    }else {
+      form_set_error('tags_remove',"Please put a valid remove $machine_name");
+    }
+    
+    $update_tags = explode(",", $form_state['values']['tags_update']);
+  //  print_r($update_tags);die;
+    $tid_updates = array();
+    foreach($update_tags as $u_key => $u_value) {
+       $terms_update = taxonomy_get_term_by_name($u_value, $machine_name);
+	 if (!empty($terms_update)) {
+	  $term_update_tid = array_shift($terms_update);
+	  $tid_update = $term_update_tid->tid;
+	  $tid_updates[] = $tid_update;
+	}else {
+	  form_set_error('tags_update','Please put a valid update tag');
+	}
+    }
+//   print_r($tid_updates);die;
+    if(isset($tid) && isset($tid_update)) {
+      //select all nodes by tid
+      $nids = taxonomy_select_nodes($tid,TRUE,200);
+      $no = 0;
+      $dna_tags_history = array();
+      foreach($nids as $nid) {
+	$node = node_load($nid); // ...where $nid is the node id
+	$f = 'field_'.$machine_name;
+	$field_type = $node->$f;
+	foreach($field_type['und'] as $keys => $values) {
+	  if($values['tid'] == $tid) {
+	    //replace updated tid with existing tid
+	    if($machine_name == 'authors') {
+	     // $node->field_author['und'][$keys]['tid'] = $tid_update;
+	      unset($node->field_authors['und'][$keys]);
+	      foreach($tid_updates as $key_u => $val_u) {
+		$node->field_authors['und'][]['tid'] = $val_u;
+	      }	      
+	    }
+
+	    if($machine_name == 'tags') {
+	      //$node->field_tags['und'][$keys]['tid'] = $tid_update;
+	      unset($node->field_tags['und'][$keys]);
+	      foreach($tid_updates as $key_u => $val_u) {
+		$node->field_tags['und'][]['tid'] = $val_u;
+	      } 
+	    }
+	
+            if($machine_name == 'agencies') {
+              unset($node->field_agencies['und'][$keys]);
+              foreach($tid_updates as $key_u => $val_u) {
+                $node->field_agencies['und'][]['tid'] = $val_u;
+              }
+            }
+             
+            if($machine_name == 'cities') {
+	      //$node->field_tags['und'][$keys]['tid'] = $tid_update;
+	      unset($node->field_cities['und'][$keys]);
+	      foreach($tid_updates as $key_u => $val_u) {
+		$node->field_cities['und'][]['tid'] = $val_u;
+	      } 
+	    }
+	  }
+	}
+//        print_r($node);die;
+	drupal_set_message('node nid is: '.$nid.' content type is: '.$node->type);
+	$no++;
+	node_save($node);      
+      }
+    foreach($update_tags as $u_key => $u_value) {
+       $terms_update = taxonomy_get_term_by_name($u_value, $machine_name);
+	 if (!empty($terms_update)) {
+	  $term_update_tid = array_shift($terms_update);
+	  $tid_update = $term_update_tid->tid;
+	}
+	
+	$chnage_tid_path = taxonomy_term_uri($chnage_tid);
+	$chnage_tid_path = $chnage_tid_path['path'];
+	$term_update_tid_path = taxonomy_term_uri($term_update_tid);
+	$term_update_tid_path = $term_update_tid_path['path'];
+	$change_tid_url_alias = drupal_get_path_alias($chnage_tid_path);
+	$updated_tid_url_alias = drupal_get_path_alias($term_update_tid_path);
+	$dna_tags_history = array(
+	  'nid' => $nid,
+	  'uid' => $user->uid,
+	  'name' => $user->name,
+	  'change_tid' => $tid,
+	  'change_tid_url' => $change_tid_url_alias,
+	  'updated_tid' => $tid_update,
+	  'updated_tid_url' => $updated_tid_url_alias,
+	  'timestamp' => REQUEST_TIME,
+	);
+	// stores all tid logs of each node 
+	drupal_write_record('dna_tags_history',$dna_tags_history);
+    }    
+	 
+      //Delete tid after updated all tid of each node
+      $nids_re = taxonomy_select_nodes($tid);
+      if(empty($nids_re)) {
+	//if in case did not delete delete againe
+	$tid_status = taxonomy_term_delete($tid);
+      }
+      drupal_set_message($no ." nodes has been updated");
+      if($tid_status) {
+	$redirect_t = array(
+		      'rid' => '',
+		      'type' => 'redirect',
+		      'hash' => '',
+		      'source' => $change_tid_url_alias,
+		      'source_options' => array(),
+		      'redirect' => $term_update_tid_path,
+		      'redirect_options' => array(),
+		      'language' => 'und',
+		      'status_code' => 0,
+		      'override' => '',
+		    );
+	$redirect = (object)$redirect_t;
+	redirect_save($redirect);
+	drupal_set_message($form_state['values']['tags_remove'] ." taxonomy has been deleted");
+	$redirect_url =  "admin/config/content/$machine_name";
+      }else {
+	 drupal_set_message($form_state['values']['tags_remove'] ." taxonomy has not been deleted, please click on <b>Update</b> button to continue.",'error');
+	 $r = $form_state['values']['tags_remove'];
+	 $u = $form_state['values']['tags_update'];
+	 $redirect_url =  "admin/config/content/$machine_name/$r/$u";
+      }
+      $form_state['redirect'] =  $redirect_url;
+    }
+  }
+}
+
+function dna_tags_countdown() {
+  global $user;
+  $current_time = 3600 *24 * 5;
+   $output =  '<div class="countdown">10 seconds!</div>';
+  jquery_countdown_add(".countdown", array("until" => $current_time, "onExpiry" => "finished"));
+  drupal_add_js("function finished() { alert('You are done!');window.location.replace('http://www.google.com'); }", 'inline');
+  return $output;
+}
+

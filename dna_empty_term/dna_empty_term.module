@@ -1,0 +1,201 @@
+<?php
+
+/**
+  * Implements hook_permission().
+  */
+function dna_empty_term_permission() {
+  return array(
+    'dna tags zero articles' => array(
+      'title' => t('dna tags zero articles'),
+      'description' => t('dna tags zero articles view.'),
+    )
+  );
+}
+
+/**
+  * implimentation of hook_menu()
+  */
+function dna_empty_term_menu() {
+  $items = array();
+
+  $items['admin/zero/nodes'] = array(
+    'title' => 'Zero node tag list',
+    'description' => 'Zero node tag list',
+    'page callback' => 'dna_empty_term_zero_node_tid',
+    'access arguments' => array('dna tags zero articles'),
+  );
+
+  $items['admin/zero/nodes/all'] = array(
+    'title' => 'All',
+    'description' => 'Zero node tag list',
+    'page callback' => 'dna_empty_term_zero_node_tid',
+    'access arguments' => array('dna tags zero articles'),
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+    'weight' => -10
+  );
+
+ $vids = taxonomy_get_vocabularies();
+ foreach($vids as $keys => $values) {
+   $field_table_name = "field_data_field_{$values->machine_name}";
+   $name = $values->name;
+   $vid = $values->vid;
+   if(db_table_exists($field_table_name)) {
+     $items["admin/zero/nodes/$vid"] = array(
+       'title' => "$name",
+       'description' => "Zero node tag list for $name",
+       'page callback' => 'dna_empty_term_zero_node_tid',
+       'access arguments' => array('dna tags zero articles'),
+       'type' => MENU_LOCAL_TASK,
+     );
+   }
+ }
+  return $items;
+}
+
+/**
+ * select zero node tid
+ */
+function dna_empty_term_zero_node_tid() {
+  $vid = arg(3);
+  $result =  dna_empty_term_zero_node_query_result($vid);
+  $rows = $result['value'];
+  $rowcount = $result['count'];
+  $output = "<h2>Total number of zero node tags $rowcount</h2>";
+  $table_result = drupal_get_form('dna_empty_term_zero_node_table_view_form', $rows);
+  $output .= drupal_render($table_result);
+
+  return $output;
+}
+
+/**
+  *
+  */
+function dna_empty_term_zero_node_query_result($vid) {
+  // we are extending the PagerDefault class here
+  // it has a default of 10 rows per page
+  // the extend('PagerDefault') part here does all the magic.
+    $query = db_select('taxonomy_term_data', 'td')->extend('PagerDefault');
+  //$query->leftJoin('taxonomy_index', 'ti', 'td.tid = ti.tid');
+  if(is_numeric($vid)) {
+    $vid_info = taxonomy_vocabulary_load($vid);
+    $field_table_name = "field_data_field_{$vid_info->machine_name}";
+    if(db_table_exists($field_table_name)) {
+      $columen_name =  "field_{$vid_info->machine_name}_tid";
+      $query->leftJoin($field_table_name, 'cti', "td.tid = cti.$columen_name");
+      $query->condition('td.vid', $vid);
+      $query->isNull("cti.$columen_name");
+    }
+  }else {
+    $all_vo = taxonomy_get_vocabularies();
+    foreach($all_vo as $vid_info) {
+      $field_table_name = "field_data_field_{$vid_info->machine_name}";
+      if(db_table_exists($field_table_name)) {
+        $columen_name =  "field_{$vid_info->machine_name}_tid";
+        $query->leftJoin($field_table_name, $field_table_name, "td.tid = $field_table_name.$columen_name");
+        $query->isNull("$field_table_name.$columen_name");
+      }
+    }
+  }
+  $query->fields('td', array('tid'));
+  //$query->fields('ti', array('nid'));
+  $query->fields('td', array('name'));
+  //$query->isNull('ti.nid');
+  $rowcount =  $query->getCountQuery()->execute()->fetchField();//$query->execute()->rowCount();
+  $result = $query
+ ->limit(100)  // this is where you change the number of rows
+          ->execute();
+  $rows = array();
+  foreach ($result as $row) {
+    $tid = $row->tid;
+    $rows[$tid] = array(
+      'tid' => $tid,
+      'nid' => 0,
+      'name' => l(t($row->name), "taxonomy/term/$tid"),
+      'operation' => l(t('Edit'), "taxonomy/term/$tid/edit"),
+      'term_name' => $row->name,
+    );
+  }
+
+  if(isset($_SESSION['term_tid_name'])) {
+    unset($_SESSION['term_tid_name']);
+    $_SESSION['term_tid_name'] = $rows;
+  }else {
+    $_SESSION['term_tid_name'] = $rows;
+  }
+  $output = array('count' => $rowcount, 'value' => $rows);
+  return $output;
+
+}
+
+/**
+  *hook_form()
+  */
+
+function dna_empty_term_zero_node_table_view_form($form, &$form_state,$rows) {
+  if (!isset($form_state['storage']['confirm'])) {
+    $header = array(
+      'tid' => t('tid'),
+      'nid' => t('nid'),
+      'name' => t('name'),
+      'operation' => t('operation'),
+    );
+
+    $form['tids'] = array(
+      '#type' => 'tableselect',
+      '#header' => $header,
+      '#options' => $rows,
+      // Should $options be array(), this will get displayed:
+      '#empty' => t('No items available'),
+    );
+
+   $form['pager'] = array('#markup' => theme('pager'));
+    $form['submit'] = array(
+      '#type' => 'submit',
+      '#value' => t('Delete'),
+    );
+
+    return $form;
+ }else {
+    $desc = 'You are unable to get the deleted data again.';
+    return confirm_form(
+             array(),
+             'Are you sure?',
+             'admin/zero/nodes',
+             $desc,
+             'Continue',
+             'Cancel'
+           );
+  }
+}
+
+function dna_empty_term_zero_node_table_view_form_submit($form, &$form_state) {
+  if (!isset($form_state['storage']['confirm'])) {
+    // This will cause the form to be rebuilt, entering the confirm part of the
+    // form.
+    $form_state['storage']['confirm'] = TRUE;
+    $form_state['storage']['original_form'] = $form_state['values'];
+    $form_state['rebuild'] = TRUE;
+  }else {
+    global $user;
+    $term_id_values = $_SESSION['term_tid_name'];
+    $tids = $form_state['storage']['original_form']['tids'];
+    foreach($tids as $tid) {
+      if($tid) {
+        $status = taxonomy_term_delete($tid);
+        if($status) {
+          $term_name = $term_id_values[$tid]['term_name'];
+          $no_article_tags_deleted = array(
+            'uid' =>    $user->uid,
+            'name' => $user->name,
+            'tid' => $tid,
+            'term_name' => $term_name,
+            'timestamp' => time(),
+          );
+          drupal_write_record('no_article_tags_deleted', $no_article_tags_deleted);
+        }
+      }
+    }
+    drupal_set_message(t('All selected zero node tags deleted sucessfully'));
+  }
+}
+

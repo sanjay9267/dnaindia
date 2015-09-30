@@ -1,0 +1,92 @@
+<?php
+
+/**
+ * Implements hook_schema().
+ */
+function dna_tags_schema() {
+  $schema['dna_tags_history'] = array(
+    'description' => 'Stores tags informations for each {node}.',
+    'fields' => array(
+     'did' => array(
+        'description' => 'The primary identifier for this version.',
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+     ),
+      'nid' => array(
+        'description' => 'The {node} this version belongs to.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'uid' => array(
+        'description' => 'The {users}.uid that created this update.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+			'name' => array(
+        'description' => 'Name of the user.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'change_tid' => array(
+        'description' => 'change tid for node.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'change_tid_url' => array(
+        'description' => 'change tid url alias.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+			
+			'updated_tid' => array(
+        'description' => 'Updated tid for node.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'updated_tid_url' => array(
+        'description' => 'updated url alias of updated tid.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      
+      'timestamp' => array(
+        'description' => 'A Unix timestamp indicating when this version was created.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+     
+    ),
+    'indexes' => array(
+      'nid' => array('nid'),
+      'uid' => array('uid'),
+    ),
+    'primary key' => array('did'),
+    'foreign keys' => array(
+      'dna_tags' => array(
+        'table' => 'node',
+        'columns' => array('nid' => 'nid'),
+      ),
+      'dna_author' => array(
+        'table' => 'users',
+        'columns' => array('uid' => 'uid'),
+      ),
+    ),
+  );
+   return $schema;
+}
+

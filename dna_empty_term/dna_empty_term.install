@@ -1,0 +1,61 @@
+<?php
+
+/**
+ * Implements hook_schema().
+ */
+function dna_empty_term_schema() {	
+	 $schema['no_article_tags_deleted'] = array(
+		 'description' => 'Zero article tags deleted.',
+		 'fields' => array(
+			 'id' => array(
+				 'description' => 'The primary identifier for this version.',
+				 'type' => 'serial',
+				 'unsigned' => TRUE,
+				 'not null' => TRUE,
+			 ),
+			 'uid' => array(
+				 'description' => 'The {users}.uid that created this update.',
+				 'type' => 'int',
+				 'not null' => TRUE,
+				 'default' => 0,
+			 ),
+			 'name' => array(
+				 'description' => 'Name of the user.',
+				 'type' => 'varchar',
+				 'length' => 255,
+				 'not null' => TRUE,
+				 'default' => '',
+			 ),
+			 'tid' => array(
+				 'description' => 'change tid for node.',
+				 'type' => 'int',
+				 'unsigned' => TRUE,
+				 'not null' => TRUE,
+				 'default' => 0,
+			 ),
+			 
+			 'term_name' => array(
+				 'description' => 'Name of the term.',
+				 'type' => 'varchar',
+				 'length' => 255,
+				 'not null' => TRUE,
+				 'default' => '',
+			 ),
+			 
+			 'timestamp' => array(
+				 'description' => 'A Unix timestamp indicating when this version was created.',
+				 'type' => 'int',
+				 'not null' => TRUE,
+				 'default' => 0,
+			 ),
+		 
+		 ),
+		 'indexes' => array(
+			 'uid' => array('uid'),
+		 ),
+		 'primary key' => array('id'),
+	 );
+	
+   return $schema;
+}
+
